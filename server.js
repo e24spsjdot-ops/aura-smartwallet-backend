@@ -21,10 +21,15 @@ const PORT = process.env.PORT || 3001;
 
 // Security middleware
 app.use(helmet());
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'https://aura-smartwallet-ai.netlify.app'
+  ],
   credentials: true
 }));
+
 
 // Rate limiting to prevent abuse
 const limiter = rateLimit({
