@@ -358,6 +358,13 @@ MIT License - see LICENSE file for details
 - **Discord:** Join AURA Network Discord
 - **Email:** e24sps.jdot@gmail.com
 
+
+## 🌐 Live Backend
+**Base URL:** [https://aura-smartwallet-backend.onrender.com](https://aura-smartwallet-backend.onrender.com)
+
+The backend is deployed on [Render](https://render.com) (Free Tier).
+> ⚠️ May take up to 50 seconds to wake up after inactivity.
+
 ---
 
 Built with ❤️ for AURA Network Hackathon
