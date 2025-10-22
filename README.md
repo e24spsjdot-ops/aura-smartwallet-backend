@@ -62,29 +62,27 @@ curl http://localhost:3001/health
 # Get wallet overview
 curl http://localhost:3001/api/wallet/0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb
 ```
-## 5. 🧪 Running Tests
+## 🧪 Running Tests
 
 To test the entire project automatically, you can use the included `test-all.sh` script.
 
-### Option A – Use Git Bash (Recommended)
-
-If you have Git for Windows installed:
+Run the following depending on your system:
 
 ```bash
+# 🅰️ Option A – Use Git Bash (Recommended)
+# If you have Git for Windows installed:
 chmod +x test-all.sh
 ./test-all.sh
 
-## Option B – macOS / Linux
-```bash
+# 🅱️ Option B – macOS / Linux
 chmod +x test-all.sh
 ./test-all.sh
 
-## 🧩 Option C – Windows CMD (Not Recommended)
+# 🧩 Option C – Windows CMD (Not Recommended)
+# CMD doesn’t support chmod or ./ syntax.
+# Please use Git Bash instead.
 
-```bash
-git add README.md
-git commit -m "Update README with test-all.sh usage instructions"
-git push
+
 
 ## 📡 API Endpoints
 
