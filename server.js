@@ -49,6 +49,16 @@ app.get('/health', (req, res) => {
   });
 });
 
+// 🟢 Add this root route (for homepage /)
+app.get('/', (req, res) => {
+  res.json({
+    message: "🚀 Welcome to AURA SmartWallet AI Backend",
+    status: "running",
+    docs: "https://github.com/e24spsjdot-ops/aura-smartwallet-backend#readme",
+    health: "/health"
+  });
+});
+
 // API Routes
 app.use('/api/wallet', walletRoutes);
 app.use('/api/analysis', analysisRoutes);
