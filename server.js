@@ -18,6 +18,12 @@ console.log("OpenAI key found:", !!process.env.OPENAI_API_KEY);
 
 const app = express();
 app.set('trust proxy', 1);
+// Rate limiting to prevent abuse
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use('/api/', limiter);
 const PORT = process.env.PORT || 3001;
 
 // Security middleware
@@ -30,14 +36,6 @@ app.use(cors({
   ],
   credentials: true
 }));
-
-
-// Rate limiting to prevent abuse
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use('/api/', limiter);
 
 // Body parsing middleware
 app.use(express.json());
