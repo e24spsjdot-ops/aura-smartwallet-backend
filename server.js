@@ -76,7 +76,7 @@ app.get('/api/status', async (req, res) => {
       environment: process.env.NODE_ENV || 'development',
       keyStatus,
       uptime: `${uptimeMinutes} minutes`,
-      cacheSize: await cache.size?.(),
+      cacheSize: (typeof cache.size === 'function') ? await cache.size() : 'N/A',
       system: {
         platform: os.platform(),
         cpuCount: os.cpus().length,
