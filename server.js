@@ -4,6 +4,11 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import OpenAI from 'openai';
+import os from 'os';
+
+// ✅ ADD THIS IMPORT
+import { CacheService } from './services/cacheService.js';
 
 // Route imports
 import walletRoutes from './routes/wallet.js';
@@ -15,15 +20,19 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/logger.js';
 
 console.log("OpenAI key found:", !!process.env.OPENAI_API_KEY);
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const cache = new CacheService();
 
 const app = express();
 app.set('trust proxy', 1);
+
 // Rate limiting to prevent abuse
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100 // limit each IP to 100 requests per windowMs
 });
 app.use('/api/', limiter);
+
 const PORT = process.env.PORT || 3001;
 
 // Security middleware
@@ -43,6 +52,46 @@ app.use(express.urlencoded({ extended: true }));
 
 // Custom middleware
 app.use(requestLogger);
+
+/**
+ * ✅ Health + API status endpoint
+ * Shows API key status, cache stats, uptime, and memory usage
+ */
+app.get('/api/status', async (req, res) => {
+  try {
+    // check if OpenAI API key works
+    let keyStatus = 'unknown';
+    try {
+      await openai.models.list({ limit: 1 });
+      keyStatus = 'active';
+    } catch (e) {
+      keyStatus = 'invalid or exhausted';
+    }
+
+    const uptimeMinutes = (process.uptime() / 60).toFixed(1);
+    const memory = process.memoryUsage();
+
+    res.json({
+      status: 'ok',
+      environment: process.env.NODE_ENV || 'development',
+      keyStatus,
+      uptime: `${uptimeMinutes} minutes`,
+      cacheSize: await cache.size?.(),
+      system: {
+        platform: os.platform(),
+        cpuCount: os.cpus().length,
+        memoryUsedMB: (memory.rss / 1024 / 1024).toFixed(2),
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
