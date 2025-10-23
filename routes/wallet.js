@@ -15,6 +15,11 @@ router.get('/:address',
   walletController.getWalletOverview
 );
 
+router.get('/:address/overview',
+  validateWalletAddress,
+  walletController.getWalletOverview
+);
+
 /**
  * GET /api/wallet/:address/tokens
  * Get detailed token holdings for a wallet
