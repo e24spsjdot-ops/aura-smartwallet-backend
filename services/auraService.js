@@ -3,19 +3,15 @@ import axios from 'axios';
 
 export class AuraService {
   constructor() {
-    // REAL AURA API endpoint from documentation
-    this.baseURL = process.env.AURA_API_URL || 'https://aura.adex.network';
-    // AURA API is public - no API key needed!
+    // ✅ Use correct public Aura API base URL
+    this.baseURL = process.env.AURA_API_URL || 'https://aura.adex.network/api';
 
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 30000, // Increased timeout for AI processing
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      timeout: 30000,
+      headers: { 'Content-Type': 'application/json' }
     });
 
-    // Add response interceptor for error handling
     this.client.interceptors.response.use(
       response => response,
       error => this.handleError(error)
@@ -27,7 +23,7 @@ export class AuraService {
    */
   async getWalletData(address) {
     try {
-      const response = await this.client.get(`/v1/accounts/${address}`);
+      const response = await this.client.get(`/wallet/${address}`);
       return {
         address: response.data.address,
         balance: response.data.balance || 0,
@@ -48,7 +44,7 @@ export class AuraService {
    */
   async getTokenBalances(address) {
     try {
-      const response = await this.client.get(`/v1/accounts/${address}/tokens`);
+      const response = await this.client.get(`/token-balances/${address}`);
       return response.data.tokens.map(token => ({
         symbol: token.symbol,
         name: token.name,
@@ -71,7 +67,7 @@ export class AuraService {
    */
   async getTransactions(address, limit = 20, offset = 0) {
     try {
-      const response = await this.client.get(`/v1/accounts/${address}/transactions`, {
+      const response = await this.client.get(`/transactions/${address}`, {
         params: { limit, offset }
       });
       return response.data.transactions.map(tx => ({
@@ -98,7 +94,7 @@ export class AuraService {
    */
   async getTokenPrice(symbol) {
     try {
-      const response = await this.client.get(`/v1/tokens/${symbol}/price`);
+      const response = await this.client.get(`/prices/${symbol}`);
       return {
         symbol,
         current: response.data.price,
@@ -120,7 +116,7 @@ export class AuraService {
    */
   async getMarketConditions() {
     try {
-      const response = await this.client.get('/v1/market/overview');
+      const response = await this.client.get(`/market/overview`);
       return {
         totalMarketCap: response.data.totalMarketCap,
         btcDominance: response.data.btcDominance,
@@ -137,12 +133,11 @@ export class AuraService {
   }
 
   /**
-   * Get investment strategies (if available)
+   * Get investment strategies
    */
   async getInvestmentStrategies(address) {
     try {
-      // Replace with real Aura endpoint if exists, else mock
-      const response = await this.client.get(`/v1/accounts/${address}/strategies`);
+      const response = await this.client.get(`/strategies/${address}`);
       return response.data.strategies || [];
     } catch (error) {
       console.error('Error fetching strategies:', error.message);
@@ -154,7 +149,7 @@ export class AuraService {
   }
 
   /**
-   * ✅ Combines wallet data + strategies for portfolio analysis
+   * Combine portfolio data
    */
   async getPortfolioWithStrategies(address) {
     try {
@@ -177,9 +172,6 @@ export class AuraService {
     }
   }
 
-  /**
-   * Error handler
-   */
   handleError(error) {
     if (error.response) {
       const message = error.response.data?.message || 'AURA API error';
@@ -191,8 +183,7 @@ export class AuraService {
     }
   }
 
-  // ==================== MOCK DATA FOR DEVELOPMENT ====================
-
+  // === MOCK DATA (for dev) ===
   getMockWalletData(address) {
     return {
       address,
@@ -204,10 +195,10 @@ export class AuraService {
 
   getMockTokenBalances() {
     return [
-      { symbol: 'AURA', name: 'Aura Network', balance: 5000, valueUSD: 2500, contractAddress: '0x123...', decimals: 18 },
-      { symbol: 'ETH', name: 'Ethereum', balance: 0.5, valueUSD: 1800, contractAddress: '0x456...', decimals: 18 },
-      { symbol: 'USDC', name: 'USD Coin', balance: 1000, valueUSD: 1000, contractAddress: '0x789...', decimals: 6 },
-      { symbol: 'LINK', name: 'Chainlink', balance: 50, valueUSD: 850, contractAddress: '0xabc...', decimals: 18 }
+      { symbol: 'AURA', name: 'Aura Network', balance: 5000, valueUSD: 2500 },
+      { symbol: 'ETH', name: 'Ethereum', balance: 0.5, valueUSD: 1800 },
+      { symbol: 'USDC', name: 'USD Coin', balance: 1000, valueUSD: 1000 },
+      { symbol: 'LINK', name: 'Chainlink', balance: 50, valueUSD: 850 }
     ];
   }
 
@@ -220,31 +211,30 @@ export class AuraService {
         value: 100,
         timestamp: new Date(Date.now() - 3600000).toISOString(),
         status: 'success',
-        gasUsed: 21000,
-        tokenTransfers: []
+        gasUsed: 21000
       }
     ];
   }
 
   getMockPriceData(symbol) {
     const prices = {
-      'AURA': { current: 0.50, change24h: 5.2 },
-      'ETH': { current: 3600, change24h: -2.1 },
-      'USDC': { current: 1.0, change24h: 0.0 },
-      'LINK': { current: 17, change24h: 3.8 }
+      AURA: { current: 0.5, change24h: 5.2 },
+      ETH: { current: 3600, change24h: -2.1 },
+      USDC: { current: 1.0, change24h: 0 },
+      LINK: { current: 17, change24h: 3.8 }
     };
     const data = prices[symbol] || { current: 1, change24h: 0 };
     return {
       symbol,
       ...data,
-      marketCap: data.current * 1000000000,
-      volume24h: data.current * 50000000
+      marketCap: data.current * 1e9,
+      volume24h: data.current * 5e7
     };
   }
 
   getMockMarketConditions() {
     return {
-      totalMarketCap: 2500000000000,
+      totalMarketCap: 2.5e12,
       btcDominance: 48.5,
       fearGreedIndex: 65,
       trending: ['BTC', 'ETH', 'AURA']
@@ -253,8 +243,8 @@ export class AuraService {
 
   getMockStrategies() {
     return [
-      { id: 1, name: 'Balanced Yield Strategy', description: 'Focuses on steady staking rewards.', risk: 'Medium' },
-      { id: 2, name: 'Aggressive Growth', description: 'Targets high-risk, high-reward opportunities.', risk: 'High' }
+      { id: 1, name: 'Balanced Yield Strategy', description: 'Steady staking rewards.', risk: 'Medium' },
+      { id: 2, name: 'Aggressive Growth', description: 'High-risk, high-reward.', risk: 'High' }
     ];
   }
 }
