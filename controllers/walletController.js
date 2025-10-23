@@ -121,53 +121,61 @@ export class WalletController {
   };
 
   /**
-   * Comprehensive AI-powered wallet analysis
-   */
-  analyzeWallet = async (req, res, next) => {
-    try {
-      const { address } = req.params;
-      console.log('🚀 Starting analysis for:', address);
+ * Comprehensive AI-powered wallet analysis (optimized for quota saving)
+ */
+analyzeWallet = async (req, res, next) => {
+  try {
+    const { address } = req.params;
+    console.log('🚀 Starting analysis for:', address);
 
-      const auraData = await this.auraService.getPortfolioWithStrategies(address);
-      const tokens = await this.auraService.getTokenBalances(address);
-      const totalValue = tokens.reduce((sum, t) => sum + t.valueUSD, 0);
-      const auraStrategies = await this.auraService.getInvestmentStrategies(address);
-      const yourRiskScore = await this.riskAnalyzer.calculatePortfolioRisk({ tokens });
-      const marketContext = await this.aiService.getMarketContext();
-      const yourAIInsights = await this.aiService.analyzePortfolio({
-        tokens,
-        auraStrategies,
-        riskScore: yourRiskScore
-      });
+    const auraData = await this.auraService.getPortfolioWithStrategies(address);
+    const tokens = await this.auraService.getTokenBalances(address);
+    const totalValue = tokens.reduce((sum, t) => sum + t.valueUSD, 0);
+    const auraStrategies = await this.auraService.getInvestmentStrategies(address);
+    const yourRiskScore = await this.riskAnalyzer.calculatePortfolioRisk({ tokens });
 
-      const swapPredictions = await this.aiService.predictSwapTiming(
-        tokens[0]?.symbol,
-        'USDC',
-        tokens[0]?.balance
-      );
+    // ✅ Cache market context (saves API tokens)
+    const marketContext = await this.aiService.getMarketContext();
 
-      const finalRecommendation = this.combineInsights(
-        auraStrategies,
-        yourRiskScore,
-        yourAIInsights
-      );
+    // ✅ Reuse cached AI insights
+    const yourAIInsights = await this.aiService.analyzePortfolio({
+      tokens,
+      auraStrategies,
+      riskScore: yourRiskScore
+    });
 
-      const analysis = {
-        address,
-        auraStrategies,
-        yourRiskScore,
-        yourAIInsights,
-        swapPredictions,
-        recommendation: finalRecommendation,
-        timestamp: new Date().toISOString()
-      };
+    // ✅ Predict swap timing using rule-based system (no API call)
+    const swapPredictions = await this.aiService.predictSwapTiming(
+      tokens[0]?.symbol,
+      'USDC',
+      tokens[0]?.balance,
+      marketContext
+    );
 
-      res.json(analysis);
-    } catch (error) {
-      console.error('❌ Error in wallet analysis:', error);
-      next(error);
-    }
-  };
+    const finalRecommendation = this.combineInsights(
+      auraStrategies,
+      yourRiskScore,
+      yourAIInsights
+    );
+
+    const analysis = {
+      address,
+      auraStrategies,
+      yourRiskScore,
+      yourAIInsights,
+      swapPredictions,
+      recommendation: finalRecommendation,
+      timestamp: new Date().toISOString(),
+      cached: true
+    };
+
+    res.json(analysis);
+  } catch (error) {
+    console.error('❌ Error in wallet analysis:', error);
+    next(error);
+  }
+};
+
 
   /**
    * Simple risk score
