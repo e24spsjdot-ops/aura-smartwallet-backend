@@ -2,7 +2,7 @@
 import OpenAI from 'openai';
 import { CacheService } from './cacheService.js';
 
-// 🧹 Utility: safely clean JSON responses that come with markdown formatting
+// 🧹 Clean up GPT responses that come wrapped in ```json ... ```
 function cleanJSON(text) {
   if (!text) return text;
   return text.replace(/```json|```/g, '').trim();
@@ -30,7 +30,6 @@ export class AIService {
 
     try {
       // 🧠 Optional: skip GPT call if quota saving is critical
-      // Uncomment this return to disable GPT call entirely
       // return { sentiment: 'Neutral', riskLevel: 'MEDIUM', summary: 'Stable market' };
 
       const prompt = `Give a very short JSON summary of crypto market sentiment, risk level, and outlook. 
@@ -39,23 +38,16 @@ export class AIService {
       const response = await this.client.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 80, // ⬇️ reduce tokens to save quota
+        max_tokens: 100,
         temperature: 0.5,
       });
 
-      const rawText = response.choices[0]?.message?.content?.trim();
-      const cleaned = cleanJSON(rawText);
-
-      let parsed;
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch {
-        console.warn('⚠️ Could not parse market context JSON. Using fallback.');
-        parsed = { sentiment: 'Neutral', riskLevel: 'MEDIUM', summary: 'Stable or uncertain conditions' };
-      }
+      const text = response.choices[0]?.message?.content?.trim();
+      const parsed = JSON.parse(cleanJSON(text));
 
       this.cachedMarketContext = parsed;
-      await this.cache.set(cacheKey, parsed, 900); // cache 15 minutes
+      await this.cache.set(cacheKey, parsed, 600); // cache for 10 minutes
+
       return parsed;
     } catch (error) {
       console.error('⚠️ Market context fallback due to error:', error.message);
@@ -74,8 +66,7 @@ export class AIService {
     if (cached) return cached;
 
     try {
-      // Reduce token usage by truncating token list
-      const topTokens = tokens.slice(0, 3); // ⬇️ fewer tokens to save cost
+      const topTokens = tokens.slice(0, 5);
       const prompt = `
         Analyze this portfolio briefly:
         Tokens: ${topTokens.map(t => `${t.symbol}: $${t.valueUSD}`).join(', ')}
@@ -87,26 +78,12 @@ export class AIService {
       const response = await this.client.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 150, // ⬇️ fewer tokens
+        max_tokens: 200,
         temperature: 0.6,
       });
 
-      const rawText = response.choices[0]?.message?.content?.trim();
-      const cleaned = cleanJSON(rawText);
-
-      let insights;
-      try {
-        insights = JSON.parse(cleaned);
-      } catch {
-        console.warn('⚠️ Could not parse AI insights JSON. Using fallback.');
-        insights = {
-          keyInsights: [
-            'Portfolio shows balanced exposure.',
-            'Diversify stable and volatile assets for lower risk.',
-            'Consider yield strategies for unused capital.'
-          ],
-        };
-      }
+      const text = response.choices[0]?.message?.content?.trim();
+      const insights = JSON.parse(cleanJSON(text));
 
       await this.cache.set(cacheKey, insights, 900); // 15 min cache
       return insights;
