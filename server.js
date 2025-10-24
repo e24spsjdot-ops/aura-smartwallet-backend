@@ -38,11 +38,9 @@ const PORT = process.env.PORT || 3001;
 // Security middleware
 app.use(helmet());
 
+// ✅ Allow frontend domain only
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://aura-smartwallet-ai.netlify.app'
-  ],
+  origin: "https://aura-smartwallet-ai.netlify.app",
   credentials: true
 }));
 
