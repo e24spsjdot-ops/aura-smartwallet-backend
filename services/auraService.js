@@ -1,25 +1,30 @@
-// services/auraService.js - Handles all AURA API interactions
+// services/auraService.js - Aura API + CoinGecko fallback (hybrid live data)
 import axios from 'axios';
+import fetch from 'node-fetch';
+import { CacheService } from './cacheService.js';
 
 export class AuraService {
   constructor() {
-    // ✅ Use correct public Aura API base URL
+    this.cache = new CacheService();
+
+    // ✅ Use correct Aura Adex public API base URL
     this.baseURL = process.env.AURA_API_URL || 'https://aura.adex.network/api';
+    this.coingeckoBase = 'https://api.coingecko.com/api/v3';
 
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 30000,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
 
     this.client.interceptors.response.use(
-      response => response,
-      error => this.handleError(error)
+      (response) => response,
+      (error) => this.handleError(error)
     );
   }
 
   /**
-   * Get wallet data from AURA
+   * 🪙 Get wallet info
    */
   async getWalletData(address) {
     try {
@@ -28,7 +33,7 @@ export class AuraService {
         address: response.data.address,
         balance: response.data.balance || 0,
         age: response.data.createdAt || null,
-        lastActivity: response.data.lastTransaction || null
+        lastActivity: response.data.lastTransaction || null,
       };
     } catch (error) {
       console.error('Error fetching wallet data:', error.message);
@@ -40,37 +45,34 @@ export class AuraService {
   }
 
   /**
-   * Get token balances for a wallet
+   * 🧾 Token balances
    */
   async getTokenBalances(address) {
     try {
       const response = await this.client.get(`/token-balances/${address}`);
-      return response.data.tokens.map(token => ({
+      return response.data.tokens.map((token) => ({
         symbol: token.symbol,
         name: token.name,
         balance: token.balance,
         valueUSD: token.usdValue || 0,
         contractAddress: token.contractAddress,
-        decimals: token.decimals
+        decimals: token.decimals,
       }));
     } catch (error) {
-      console.error('Error fetching token balances:', error.message);
-      if (process.env.NODE_ENV === 'development') {
-        return this.getMockTokenBalances();
-      }
-      throw error;
+      console.warn('⚠️ Token balances fallback:', error.message);
+      return this.getMockTokenBalances();
     }
   }
 
   /**
-   * Get transaction history
+   * 🔍 Transactions
    */
   async getTransactions(address, limit = 20, offset = 0) {
     try {
       const response = await this.client.get(`/transactions/${address}`, {
-        params: { limit, offset }
+        params: { limit, offset },
       });
-      return response.data.transactions.map(tx => ({
+      return response.data.transactions.map((tx) => ({
         hash: tx.hash,
         from: tx.from,
         to: tx.to,
@@ -78,100 +80,142 @@ export class AuraService {
         timestamp: tx.timestamp,
         status: tx.status,
         gasUsed: tx.gasUsed,
-        tokenTransfers: tx.tokenTransfers || []
+        tokenTransfers: tx.tokenTransfers || [],
       }));
     } catch (error) {
-      console.error('Error fetching transactions:', error.message);
-      if (process.env.NODE_ENV === 'development') {
-        return this.getMockTransactions(address);
-      }
-      throw error;
+      console.warn('⚠️ Transactions fallback:', error.message);
+      return this.getMockTransactions(address);
     }
   }
 
   /**
-   * Get current token price and market data
+   * 💰 Token price (Aura → CoinGecko fallback)
    */
   async getTokenPrice(symbol) {
+    const cacheKey = `price:${symbol}`;
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     try {
+      // ✅ Try Aura price endpoint
       const response = await this.client.get(`/prices/${symbol}`);
-      return {
+      const result = {
         symbol,
         current: response.data.price,
         change24h: response.data.change24h,
         marketCap: response.data.marketCap,
-        volume24h: response.data.volume24h
+        volume24h: response.data.volume24h,
+        source: 'AURA',
       };
-    } catch (error) {
-      console.error(`Error fetching price for ${symbol}:`, error.message);
-      if (process.env.NODE_ENV === 'development') {
+      await this.cache.set(cacheKey, result, 300);
+      return result;
+    } catch (auraError) {
+      console.warn(`⚠️ Aura price failed for ${symbol}, using CoinGecko`);
+      try {
+        const idMap = { ETH: 'ethereum', BTC: 'bitcoin', AURA: 'aura-network', USDC: 'usd-coin' };
+        const id = idMap[symbol.toUpperCase()] || symbol.toLowerCase();
+
+        const res = await fetch(
+          `${this.coingeckoBase}/simple/price?ids=${id}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`
+        );
+        const data = await res.json();
+        const priceInfo = data[id];
+        const result = {
+          symbol,
+          current: priceInfo.usd,
+          change24h: priceInfo.usd_24h_change,
+          marketCap: priceInfo.usd_market_cap,
+          volume24h: priceInfo.usd_24h_vol,
+          source: 'COINGECKO',
+        };
+        await this.cache.set(cacheKey, result, 300);
+        return result;
+      } catch (cgError) {
+        console.error('❌ Price fetch failed:', cgError.message);
         return this.getMockPriceData(symbol);
       }
-      throw error;
     }
   }
 
   /**
-   * Get overall market conditions
+   * 🌍 Market conditions (Aura → CoinGecko fallback)
    */
   async getMarketConditions() {
+    const cacheKey = 'market:conditions';
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
     try {
+      // ✅ Try Aura market overview first
       const response = await this.client.get(`/market/overview`);
-      return {
+      const result = {
         totalMarketCap: response.data.totalMarketCap,
         btcDominance: response.data.btcDominance,
         fearGreedIndex: response.data.fearGreedIndex,
-        trending: response.data.trending || []
+        trending: response.data.trending || [],
+        source: 'AURA',
       };
-    } catch (error) {
-      console.error('Error fetching market conditions:', error.message);
-      if (process.env.NODE_ENV === 'development') {
+      await this.cache.set(cacheKey, result, 120);
+      return result;
+    } catch (auraError) {
+      console.warn('⚠️ Aura market API failed, using CoinGecko fallback');
+      try {
+        const [globalRes, trendingRes] = await Promise.all([
+          fetch(`${this.coingeckoBase}/global`),
+          fetch(`${this.coingeckoBase}/search/trending`),
+        ]);
+        const globalData = await globalRes.json();
+        const trendingData = await trendingRes.json();
+
+        const result = {
+          totalMarketCap: globalData.data.total_market_cap.usd,
+          btcDominance: globalData.data.market_cap_percentage.btc,
+          fearGreedIndex: 50,
+          trending: trendingData.coins.map((c) => c.item.symbol).slice(0, 5),
+          source: 'COINGECKO',
+        };
+        await this.cache.set(cacheKey, result, 120);
+        return result;
+      } catch (cgError) {
+        console.error('❌ Both Aura & CoinGecko failed:', cgError.message);
         return this.getMockMarketConditions();
       }
-      throw error;
     }
   }
 
   /**
-   * Get investment strategies
+   * 💡 Investment strategies (Aura or mock)
    */
   async getInvestmentStrategies(address) {
     try {
       const response = await this.client.get(`/strategies/${address}`);
       return response.data.strategies || [];
     } catch (error) {
-      console.error('Error fetching strategies:', error.message);
-      if (process.env.NODE_ENV === 'development') {
-        return this.getMockStrategies();
-      }
-      throw error;
+      console.warn('⚠️ Using mock strategies');
+      return this.getMockStrategies();
     }
   }
 
   /**
-   * Combine portfolio data
+   * 🧩 Combine all portfolio data
    */
   async getPortfolioWithStrategies(address) {
-    try {
-      const [wallet, tokens, strategies] = await Promise.all([
-        this.getWalletData(address),
-        this.getTokenBalances(address),
-        this.getInvestmentStrategies(address)
-      ]);
+    const [wallet, tokens, strategies] = await Promise.all([
+      this.getWalletData(address),
+      this.getTokenBalances(address),
+      this.getInvestmentStrategies(address),
+    ]);
 
-      return {
-        version: '1.0',
-        wallet,
-        tokens,
-        strategies,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Error combining portfolio data:', error.message);
-      throw error;
-    }
+    return {
+      version: '1.1',
+      wallet,
+      tokens,
+      strategies,
+      timestamp: new Date().toISOString(),
+    };
   }
 
+  // ========== Error Handler ==========
   handleError(error) {
     if (error.response) {
       const message = error.response.data?.message || 'AURA API error';
@@ -183,13 +227,13 @@ export class AuraService {
     }
   }
 
-  // === MOCK DATA (for dev) ===
+  // ========== Mock Data ==========
   getMockWalletData(address) {
     return {
       address,
       balance: 1250.75,
       age: new Date('2023-06-15').toISOString(),
-      lastActivity: new Date().toISOString()
+      lastActivity: new Date().toISOString(),
     };
   }
 
@@ -198,7 +242,7 @@ export class AuraService {
       { symbol: 'AURA', name: 'Aura Network', balance: 5000, valueUSD: 2500 },
       { symbol: 'ETH', name: 'Ethereum', balance: 0.5, valueUSD: 1800 },
       { symbol: 'USDC', name: 'USD Coin', balance: 1000, valueUSD: 1000 },
-      { symbol: 'LINK', name: 'Chainlink', balance: 50, valueUSD: 850 }
+      { symbol: 'LINK', name: 'Chainlink', balance: 50, valueUSD: 850 },
     ];
   }
 
@@ -211,8 +255,8 @@ export class AuraService {
         value: 100,
         timestamp: new Date(Date.now() - 3600000).toISOString(),
         status: 'success',
-        gasUsed: 21000
-      }
+        gasUsed: 21000,
+      },
     ];
   }
 
@@ -221,14 +265,15 @@ export class AuraService {
       AURA: { current: 0.5, change24h: 5.2 },
       ETH: { current: 3600, change24h: -2.1 },
       USDC: { current: 1.0, change24h: 0 },
-      LINK: { current: 17, change24h: 3.8 }
+      LINK: { current: 17, change24h: 3.8 },
     };
     const data = prices[symbol] || { current: 1, change24h: 0 };
     return {
       symbol,
       ...data,
       marketCap: data.current * 1e9,
-      volume24h: data.current * 5e7
+      volume24h: data.current * 5e7,
+      source: 'MOCK',
     };
   }
 
@@ -237,14 +282,25 @@ export class AuraService {
       totalMarketCap: 2.5e12,
       btcDominance: 48.5,
       fearGreedIndex: 65,
-      trending: ['BTC', 'ETH', 'AURA']
+      trending: ['BTC', 'ETH', 'AURA'],
+      source: 'MOCK',
     };
   }
 
   getMockStrategies() {
     return [
-      { id: 1, name: 'Balanced Yield Strategy', description: 'Steady staking rewards.', risk: 'Medium' },
-      { id: 2, name: 'Aggressive Growth', description: 'High-risk, high-reward.', risk: 'High' }
+      {
+        id: 1,
+        name: 'Balanced Yield Strategy',
+        description: 'Steady staking rewards.',
+        risk: 'Medium',
+      },
+      {
+        id: 2,
+        name: 'Aggressive Growth',
+        description: 'High-risk, high-reward.',
+        risk: 'High',
+      },
     ];
   }
 }
