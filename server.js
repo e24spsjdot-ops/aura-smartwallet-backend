@@ -165,6 +165,9 @@ app.get('/api/status/market', async (req, res) => {
     });
   }
 });
+app.get('/api/system/heartbeat', (req, res) => {
+  res.json(heartbeat.getStatus());
+});
 
 // API Routes
 app.use('/api/wallet', walletRoutes);
