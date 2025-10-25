@@ -43,7 +43,7 @@ app.use(helmet());
 
 // ✅ Allow frontend domain only
 app.use(cors({
-  origin: "https://aura-smartwallet-ai.netlify.app",
+  origin: "https://aura-sense-dash.vercel.app",
   credentials: true
 }));
 
@@ -122,6 +122,49 @@ app.get('/', (req, res) => {
 //     res.status(500).json({ ok: false, error: e.message });
 //   }
 // });
+
+// ✅ Combined Market Status Route
+app.get('/api/status/market', async (req, res) => {
+  try {
+    const aiServiceModule = await import('./services/aiService.js');
+    const { AIService } = aiServiceModule;
+    const aiService = new AIService();
+
+    // 1️⃣ Get live context (AURA + CoinGecko + GPT)
+    const context = await aiService.getMarketContext();
+
+    // 2️⃣ Build quick summary
+    const summary = {
+      status: "ok",
+      sentiment: context.sentiment,
+      riskLevel: context.riskLevel,
+      advice: context.advice,
+      btc: {
+        price: context.liveData?.btcPrice,
+        change24h: context.liveData?.btcChange24h,
+      },
+      eth: {
+        price: context.liveData?.ethPrice,
+        change24h: context.liveData?.ethChange24h,
+      },
+      marketCapUSD: context.liveData?.marketCapUSD,
+      volumeUSD: context.liveData?.volumeUSD,
+      btcDominance: context.liveData?.btcDominance,
+      fearGreedIndex: context.liveData?.fearGreedIndex,
+      trending: context.liveData?.trending,
+      timestamp: context.timestamp,
+      source: "AURA + CoinGecko + GPT"
+    };
+
+    res.json(summary);
+  } catch (error) {
+    console.error("⚠️ /api/status/market failed:", error.message);
+    res.status(500).json({
+      status: "error",
+      message: error.message
+    });
+  }
+});
 
 // API Routes
 app.use('/api/wallet', walletRoutes);
