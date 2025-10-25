@@ -10,6 +10,9 @@ import os from 'os';
 // ✅ ADD THIS IMPORT
 import { CacheService } from './services/cacheService.js';
 
+// Heartbeat
+import { HeartbeatService } from './services/heartbeatService.js';
+
 // Route imports
 import walletRoutes from './routes/wallet.js';
 import analysisRoutes from './routes/analysis.js';
@@ -125,6 +128,10 @@ app.use((req, res) => {
 
 // Global error handler (must be last)
 app.use(errorHandler);
+
+// 🫀 Start heartbeat to keep backend warm & refresh market data
+const heartbeat = new HeartbeatService();
+heartbeat.start();
 
 // Start server
 app.listen(PORT, () => {
