@@ -91,31 +91,41 @@ export class AnalysisController {
   };
 
   /**
-   * 🎯 ENHANCED: Get market insights with AI context
-   */
+ * 🎯 ENHANCED: Get market insights with hybrid AURA + CoinGecko + GPT context
+ */
   getMarketInsights = async (req, res, next) => {
     try {
-      // Get AI-powered market context
+      // 🧠 Step 1: Get AI + Live market context (AURA + CoinGecko)
       const marketContext = await this.aiService.getMarketContext();
-      
-      // Get basic market data (if available)
+  
+      // 💹 Step 2: Get AURA market data (as available)
       let marketData = {};
       try {
         marketData = await this.auraService.getMarketConditions();
       } catch (e) {
-        console.log('Market data not available, using AI context only');
+        console.warn("⚠️ AURA API market data unavailable, fallback using AI liveData");
+        marketData = {
+          totalMarketCap: marketContext.liveData.marketCapUSD,
+          btcDominance: marketContext.liveData.btcDominance,
+          fearGreedIndex: marketContext.liveData.fearGreedIndex || 50,
+          trending: marketContext.liveData.trending || ["BTC", "ETH"],
+        };
       }
-      
+  
+      // 🔍 Step 3: Combine all insights
+      const combinedInsight = this.interpretMarketSentiment(marketContext);
+  
       const insights = {
         aiContext: marketContext,
         marketData,
-        combinedInsight: this.interpretMarketSentiment(marketContext),
+        combinedInsight,
         recommendations: this.getMarketRecommendations(marketContext),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-
+  
       res.json(insights);
     } catch (error) {
+      console.error("❌ getMarketInsights error:", error.message);
       next(error);
     }
   };
