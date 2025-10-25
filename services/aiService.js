@@ -53,29 +53,37 @@ export class AIService {
       const btc = prices.bitcoin || {};
       const eth = prices.ethereum || {};
 
-      // 3️⃣ Merge AURA + CoinGecko into a unified snapshot
+      // 3️⃣ Merge AURA + CoinGecko into a unified snapshot (with safe fallbacks)
       const combinedMarket = {
         totalMarketCap:
           auraData?.totalMarketCap ||
-          btc.usd_market_cap + eth.usd_market_cap ||
+          (btc.usd_market_cap ?? 0) + (eth.usd_market_cap ?? 0) ||
           0,
         btcDominance: auraData?.btcDominance || 54.0,
         ethDominance: auraData?.ethDominance || 18.0,
         fearGreedIndex: auraData?.fearGreedIndex || 50,
         trending: auraData?.trending || ["BTC", "ETH"],
         btc: {
-          price: btc.usd || 0,
-          change24h: btc.usd_24h_change || 0,
-          marketCap: btc.usd_market_cap || 0,
-          volume24h: btc.usd_24h_vol || 0,
+          price: btc.usd ?? 0,
+          change24h: btc.usd_24h_change ?? 0,
+          marketCap: btc.usd_market_cap ?? 0,
+          volume24h: btc.usd_24h_vol ?? 0,
         },
         eth: {
-          price: eth.usd || 0,
-          change24h: eth.usd_24h_change || 0,
-          marketCap: eth.usd_market_cap || 0,
-          volume24h: eth.usd_24h_vol || 0,
+          price: eth.usd ?? 0,
+          change24h: eth.usd_24h_change ?? 0,
+          marketCap: eth.usd_market_cap ?? 0,
+          volume24h: eth.usd_24h_vol ?? 0,
         },
       };
+      
+      // 🩹 If totalMarketCap is still 0, synthesize a value from prices
+      if (combinedMarket.totalMarketCap === 0 && combinedMarket.btc.price > 0) {
+        combinedMarket.totalMarketCap =
+          (combinedMarket.btc.price * 19000000) + // BTC supply estimate
+          (combinedMarket.eth.price * 120000000); // ETH supply estimate
+      }
+
 
       // 4️⃣ Ask GPT for summarized sentiment
       const prompt = `
