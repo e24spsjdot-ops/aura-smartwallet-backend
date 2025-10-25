@@ -113,15 +113,15 @@ app.get('/', (req, res) => {
   });
 });
 
-// app.get('/api/analysis/test-coingecko', async (req, res) => {
-//   try {
-//     const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd");
-//     const data = await r.json();
-//     res.json({ ok: true, data });
-//   } catch (e) {
-//     res.status(500).json({ ok: false, error: e.message });
-//   }
-// });
+app.get('/api/analysis/test-coingecko', async (req, res) => {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd");
+    const data = await r.json();
+    res.json({ ok: true, data });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 // ✅ Combined Market Status Route
 app.get('/api/status/market', async (req, res) => {
