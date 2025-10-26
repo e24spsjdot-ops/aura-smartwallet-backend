@@ -13,6 +13,9 @@ import { CacheService } from './services/cacheService.js';
 // Heartbeat
 import { HeartbeatService } from './services/heartbeatService.js';
 
+import { AIService } from "./services/aiService.js";
+
+
 // Route imports
 import walletRoutes from './routes/wallet.js';
 import analysisRoutes from './routes/analysis.js';
@@ -25,6 +28,7 @@ import { requestLogger } from './middleware/logger.js';
 console.log("OpenAI key found:", !!process.env.OPENAI_API_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const cache = new CacheService();
+const aiService = new AIService();
 
 const app = express();
 app.set('trust proxy', 1);
@@ -167,6 +171,23 @@ app.get('/api/status/market', async (req, res) => {
 });
 app.get('/api/system/heartbeat', (req, res) => {
   res.json(heartbeat.getStatus());
+});
+
+app.get("/api/debug/market-source", async (req, res) => {
+  try {
+    const context = aiService.cachedMarketContext || await aiService.getMarketContext();
+    res.json({
+      source: context?.liveData?.source || "UNKNOWN",
+      sentiment: context?.sentiment || "Neutral",
+      summary: context?.summary || "No summary available",
+      timestamp: context?.timestamp || new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Failed to retrieve market source info",
+      details: err.message,
+    });
+  }
 });
 
 // API Routes
